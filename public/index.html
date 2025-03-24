@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Orange Pi Temperature Monitor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        #devices {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+        .device {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .device h3 {
+            margin: 0 0 15px 0;
+            color: #540d96;
+        }
+        .device p {
+            margin: 10px 0;
+            font-size: 1.1em;
+        }
+        .high-temp {
+            background-color: #ffebee;
+            border: 1px solid #ffcdd2;
+        }
+        .temp-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+        .last-update {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .temp-normal {
+            background-color: #e8f5e9;
+            border: 1px solid #a5d6a7;
+        }
+        .temp-warning {
+            background-color: #fff3e0;
+            border: 1px solid #ffcc80;
+        }
+        .temp-high {
+            background-color: #fbe9e7;
+            border: 1px solid #ffab91;
+        }
+        .temp-critical {
+            background-color: #ffebee;
+            border: 1px solid #ef9a9a;
+        }
+        .temp-normal .temp-value { color: #2e7d32; }
+        .temp-warning .temp-value { color: #f57c00; }
+        .temp-high .temp-value { color: #d84315; }
+        .temp-critical .temp-value { color: #c62828; }
+        .update-time {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 1.1em;
+        }
+        .device-count {
+            text-align: center;
+            color: #2196F3;
+            margin: 10px 0;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .ambient-temp {
+            text-align: center;
+            color: #666;
+            margin: 10px 0;
+            font-size: 1.1em;
+        }
+        .copyright-footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 40px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Orange Pi Temperature Monitor</h1>
+    <div id="deviceCount" class="device-count"></div>
+    <div id="ambientTemp" class="ambient-temp"></div>
+    <div id="lastUpdate" class="update-time"></div>
+    <div id="devices"></div>
+    
+    <div class="copyright-footer">
+        © 2025 ComputerGenieCo. Licensed under GNU GPL v3.
+    </div>
+
+    <script>
+        // Add IP sorting function
+        function compareIPs(a, b) {
+            const aNum = Number(a.ip.split('.')[3]);
+            const bNum = Number(b.ip.split('.')[3]);
+            return aNum - bNum;
+        }
+
+        /**
+         * Color-coded temperature ranges:
+         * Normal (< 65°C): Green
+         * Warning (65-74°C): Yellow/Orange
+         * High (75-81°C): Dark Orange
+         * Critical (≥ 82°C): Red
+         */
+        function getTempClass(temp) {
+            if (temp >= 82) return 'temp-critical';
+            if (temp >= 75) return 'temp-high';
+            if (temp >= 65) return 'temp-warning';
+            return 'temp-normal';
+        }
+
+        // Add weather update function
+        async function updateWeather() {
+            try {
+                const response = await fetch('http://192.168.0.20:3000/api/weather');
+                const data = await response.json();
+                if (data.temp) {
+                    document.getElementById('ambientTemp').textContent = 
+                        `Ambient Temp: ${data.temp}°F`;
+                }
+            } catch (error) {
+                console.error('Weather update failed:', error);
+            }
+        }
+
+        function updateTemperatures() {
+            // Update weather first
+            updateWeather();
+            
+            // Existing temperature update code
+            fetch('http://192.168.0.20:3000/api/temperatures')
+                .then(response => response.json())
+                .then(devices => {
+                    const container = document.getElementById('devices');
+                    container.innerHTML = '';
+                    
+                    // Update device count
+                    const count = devices.length;
+                    document.getElementById('deviceCount').textContent = 
+                        `${count} Device${count !== 1 ? 's' : ''} Online`;
+                    
+                    // Update the last update time once
+                    const lastUpdate = new Date().toLocaleTimeString();
+                    document.getElementById('lastUpdate').textContent = `Last Updated: ${lastUpdate}  (Updated every 5 minutes)`;
+                    
+                    // Sort devices by IP
+                    devices.sort(compareIPs).forEach(device => {
+                        const tempClass = getTempClass(device.temp);
+                        const div = document.createElement('div');
+                        div.className = `device ${tempClass}`;
+                        div.innerHTML = `
+                            <h3>Device ${device.ip}</h3>
+                            <p class="temp-value">Avg: ${device.temp.toFixed(1)}°C</p>
+                        `;
+                        container.appendChild(div);
+                    });
+                });
+        }
+
+        // Update every 5 minutes
+        setInterval(updateTemperatures, 300000);
+        updateTemperatures();
+    </script>
+</body>
+</html>
