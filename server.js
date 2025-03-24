@@ -1,10 +1,5 @@
 /**
  * Copyright (C) 2025 ComputerGenieCo
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
  */
 
 const express = require('express');
@@ -12,39 +7,67 @@ const { NodeSSH } = require('node-ssh');
 const Evilscan = require('evilscan');
 const path = require('path');
 
-const app = express();
+// Server configuration
 const port = 3000;
-const serverIp = '192.168.1.20';
-const defaultZip = '90210';
+const serverIp = 'localhost';
 
-// Add weather data cache
-let weatherCache = {
+// Application configuration
+const defaultZip = '90210';
+const sshConfig = {
+    username: 'orangepi',
+    password: 'orangepi',
+    timeout: 5000
+};
+const refreshInterval = 300000; // 5 minutes in milliseconds
+
+// Network configuration
+const networkConfig = {
+    baseIP: '192.168.3.0',
+    netmask: '255.255.255.0',
+    scanRange: {
+        start: '192.168.3.1',
+        end: '192.168.3.254'
+    }
+};
+
+// Storage
+const devices = new Map();
+const weatherCache = {
     temp: null,
     lastUpdate: null
 };
 
-// Add CORS headers
+// Express app setup
+const app = express();
+app.use(express.static('public'));
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     next();
 });
 
-// Serve static files
-app.use(express.static('public'));
+// Function to validate IP is within network range
+function isIPInNetwork(ip, baseIP, netmask) {
+    const ipParts = ip.split('.').map(Number);
+    const networkParts = baseIP.split('.').map(Number);
+    const maskParts = netmask.split('.').map(Number);
 
-// Store discovered devices
-let devices = new Map();
+    return ipParts.every((part, i) =>
+        (part & maskParts[i]) === (networkParts[i] & maskParts[i])
+    );
+}
 
 // Scan network for Orange Pi devices
 async function scanNetwork() {
     return new Promise((resolve, reject) => {
         const options = {
-            target: '192.168.1.21-192.168.3.254',
+            target: `${networkConfig.scanRange.start}-${networkConfig.scanRange.end}`,
             port: '22',
-            status: 'TROU', // timeout, refused, open, unreachable
+            status: 'TROU',
             banner: true
         };
+
+        console.log(`Scanning range: ${networkConfig.scanRange.start} to ${networkConfig.scanRange.end}`);
 
         const scanner = new Evilscan(options);
 
@@ -54,21 +77,21 @@ async function scanNetwork() {
                     const ssh = new NodeSSH();
                     await ssh.connect({
                         host: data.ip,
-                        username: 'orangepi',
-                        password: 'orangepi',
-                        timeout: 5000
+                        ...sshConfig
                     });
 
                     // Copy the script if it doesn't exist
-                    await ssh.putFile('scripts/get_avg_temp.sh', '/tmp/get_avg_temp.sh');
-                    await ssh.execCommand('chmod +x /tmp/get_avg_temp.sh');
+                    await ssh.putFile('scripts/get_device_stats.sh', '/tmp/get_device_stats.sh');
+                    await ssh.execCommand('chmod +x /tmp/get_device_stats.sh');
 
                     // Run the script
-                    const result = await ssh.execCommand('/tmp/get_avg_temp.sh');
+                    const result = await ssh.execCommand('/tmp/get_device_stats.sh');
                     if (result.stdout) {
+                        const [temp, uptime] = result.stdout.split(' ').map(Number);
                         devices.set(data.ip, {
                             ip: data.ip,
-                            temp: parseInt(result.stdout) / 1000,
+                            temp: temp / 1000,
+                            uptime: uptime,
                             lastUpdate: new Date()
                         });
                     }
@@ -128,10 +151,9 @@ async function getWeatherData() {
             throw new Error('Invalid weather response from NWS API');
         }
 
-        weatherCache = {
-            temp: weatherData.properties.periods[0].temperature,
-            lastUpdate: new Date()
-        };
+        // Update cache properties instead of reassigning
+        weatherCache.temp = weatherData.properties.periods[0].temperature;
+        weatherCache.lastUpdate = new Date();
 
         return weatherCache;
     } catch (error) {
@@ -155,12 +177,17 @@ app.get('/api/weather', async (req, res) => {
     res.json(weatherCache);
 });
 
+// Add config endpoint
+app.get('/api/config', (req, res) => {
+    res.json({ refreshInterval });
+});
+
 // Update the scan interval handler to handle promises
 setInterval(() => {
     scanNetwork().catch(err => {
         console.error('Scan failed:', err);
     });
-}, 30000);
+}, refreshInterval);
 
 // Initial scan
 scanNetwork().catch(err => {

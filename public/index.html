@@ -93,20 +93,45 @@
             margin-top: 40px;
             border-top: 1px solid #ddd;
         }
+        #loading {
+            text-align: center;
+            font-size: 1.2em;
+            margin: 50px;
+            color: #666;
+        }
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <h1>Orange Pi Temperature Monitor</h1>
-    <div id="deviceCount" class="device-count"></div>
-    <div id="ambientTemp" class="ambient-temp"></div>
-    <div id="lastUpdate" class="update-time"></div>
-    <div id="devices"></div>
+    <div id="loading">Loading device data...</div>
+    <div id="content" class="hidden">
+        <div id="deviceCount" class="device-count"></div>
+        <div id="ambientTemp" class="ambient-temp"></div>
+        <div id="lastUpdate" class="update-time"></div>
+        <div id="devices"></div>
+    </div>
     
     <div class="copyright-footer">
         © 2025 ComputerGenieCo. Licensed under GNU GPL v3.
     </div>
 
     <script>
+        let refreshInterval;
+
+        // Add uptime formatting function
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            
+            if (days > 0) return `${days}d ${hours}h`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            return `${minutes}m`;
+        }
+
         // Add IP sorting function
         function compareIPs(a, b) {
             const aNum = Number(a.ip.split('.')[3]);
@@ -131,7 +156,7 @@
         // Add weather update function
         async function updateWeather() {
             try {
-                const response = await fetch('http://192.168.0.20:3000/api/weather');
+                const response = await fetch('/api/weather');  // Changed from absolute to relative path
                 const data = await response.json();
                 if (data.temp) {
                     document.getElementById('ambientTemp').textContent = 
@@ -147,7 +172,7 @@
             updateWeather();
             
             // Existing temperature update code
-            fetch('http://192.168.0.20:3000/api/temperatures')
+            fetch('/api/temperatures')  // Changed from absolute to relative path
                 .then(response => response.json())
                 .then(devices => {
                     const container = document.getElementById('devices');
@@ -170,15 +195,38 @@
                         div.innerHTML = `
                             <h3>Device ${device.ip}</h3>
                             <p class="temp-value">Avg: ${device.temp.toFixed(1)}°C</p>
+                            <p class="uptime">Uptime: ${formatUptime(device.uptime)}</p>
                         `;
                         container.appendChild(div);
                     });
                 });
         }
 
-        // Update every 5 minutes
-        setInterval(updateTemperatures, 300000);
-        updateTemperatures();
+        // Initialize the app
+        async function init() {
+            try {
+                // Get config first
+                const configResponse = await fetch('/api/config');
+                const config = await configResponse.json();
+                refreshInterval = config.refreshInterval;
+
+                // Initial update
+                await updateTemperatures();
+                
+                // Show content and hide loading
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+                
+                // Set refresh interval
+                setInterval(updateTemperatures, refreshInterval);
+            } catch (error) {
+                console.error('Initialization failed:', error);
+                document.getElementById('loading').textContent = 'Failed to load device data. Please refresh the page.';
+            }
+        }
+
+        // Replace the bottom section with init call
+        init();
     </script>
 </body>
 </html>
