@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Orange Pi Temperature Monitor</title>
+    <title>Orange Pi 5 Pro Monitor</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -71,6 +71,11 @@
             color: #666;
             margin-bottom: 20px;
             font-size: 1.1em;
+            line-height: 1.5;
+        }
+        .refresh-note {
+            font-size: 0.8em;
+            color: #888;
         }
         .device-count {
             text-align: center;
@@ -105,7 +110,7 @@
     </style>
 </head>
 <body>
-    <h1>Orange Pi Temperature Monitor</h1>
+    <h1>Orange Pi 5 Pro Monitor</h1>
     <div id="loading">Loading device data...</div>
     <div id="content" class="hidden">
         <div id="deviceCount" class="device-count"></div>
@@ -185,7 +190,8 @@
                     
                     // Update the last update time once
                     const lastUpdate = new Date().toLocaleTimeString();
-                    document.getElementById('lastUpdate').textContent = `Last Updated: ${lastUpdate}  (Updated every 5 minutes)`;
+                    document.getElementById('lastUpdate').innerHTML = 
+                        `Last Updated: ${lastUpdate}<br><span class="refresh-note">Automatically refreshes every 5 minutes</span>`;
                     
                     // Sort devices by IP
                     devices.sort(compareIPs).forEach(device => {

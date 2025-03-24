@@ -9,7 +9,7 @@ const path = require('path');
 
 // Server configuration
 const port = 3000;
-const serverIp = 'localhost';
+const serverIp = '0.0.0.0';  // Changed from 'localhost' to '0.0.0.0'
 
 // Application configuration
 const defaultZip = '90210';
@@ -29,6 +29,16 @@ const networkConfig = {
         end: '192.168.3.254'
     }
 };
+
+// Add this after the network configuration section
+function getTimestamp() {
+    return new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+    });
+}
 
 // Storage
 const devices = new Map();
@@ -67,7 +77,7 @@ async function scanNetwork() {
             banner: true
         };
 
-        console.log(`Scanning range: ${networkConfig.scanRange.start} to ${networkConfig.scanRange.end}`);
+        console.log(`[${getTimestamp()}] Scanning range: ${networkConfig.scanRange.start} to ${networkConfig.scanRange.end}`);
 
         const scanner = new Evilscan(options);
 
@@ -97,13 +107,13 @@ async function scanNetwork() {
                     }
                     ssh.dispose();
                 } catch (error) {
-                    console.log(`Failed to connect to ${data.ip}: ${error.message}`);
+                    console.log(`[${getTimestamp()}] Failed to connect to ${data.ip}: ${error.message}`);
                 }
             }
         });
 
         scanner.on('error', (err) => {
-            console.error('Scanner error:', err);
+            console.error(`[${getTimestamp()}] Scanner error:`, err);
         });
 
         scanner.on('done', () => {
@@ -133,7 +143,7 @@ async function getWeatherData() {
         const lat = geocodeData[0].lat;
         const long = geocodeData[0].lon;
 
-        console.log(`Geocoded ${defaultZip} to: ${lat},${long}`);
+        console.log(`[${getTimestamp()}] Geocoded ${defaultZip} to: ${lat},${long}`);
 
         // Rest of weather fetching
         const pointsResponse = await fetch(`https://api.weather.gov/points/${lat},${long}`);
@@ -157,7 +167,7 @@ async function getWeatherData() {
 
         return weatherCache;
     } catch (error) {
-        console.error('Weather fetch failed:', error.message);
+        console.error(`[${getTimestamp()}] Weather fetch failed:`, error.message);
         return weatherCache || { temp: null, lastUpdate: null };
     }
 }
@@ -185,15 +195,15 @@ app.get('/api/config', (req, res) => {
 // Update the scan interval handler to handle promises
 setInterval(() => {
     scanNetwork().catch(err => {
-        console.error('Scan failed:', err);
+        console.error(`[${getTimestamp()}] Scan failed:`, err);
     });
 }, refreshInterval);
 
 // Initial scan
 scanNetwork().catch(err => {
-    console.error('Initial scan failed:', err);
+    console.error(`[${getTimestamp()}] Initial scan failed:`, err);
 });
 
 app.listen(port, serverIp, () => {
-    console.log(`Server running at http://${serverIp}:${port}`);
+    console.log(`[${getTimestamp()}] Server running at http://${serverIp}:${port}`);
 });
