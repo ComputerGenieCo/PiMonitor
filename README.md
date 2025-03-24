@@ -1,10 +1,10 @@
 # Orange Pi Temperature Monitor
 
-A web application to monitor CPU temperatures of Orange Pi 5 Pro devices on your local network.
+A web application to monitor Orange Pi 5 Pro mining devices on your local network.
 
 ## Screenshot
 ![PiMonitor Dashboard](docs/images/screenshot.png)
-Screenshot shows the temperature monitoring dashboard with multiple Orange Pi devices.
+Screenshot shows the monitoring dashboard with multiple Orange Pi devices.
 
 ## Prerequisites
 
@@ -50,6 +50,7 @@ npm start
 
 - Automatically discovers Orange Pi devices on the network
 - Displays real-time CPU temperature readings
+- Displays uptime readings
 - Updates every 5 minutes
 - Visual warning for high temperatures (>70°C)
 
